@@ -1,0 +1,12 @@
+.env
+# Real config lives on the instance volume, never in git. Only config.example.yaml
+# (the sanitised template) is committed.
+config.yaml
+__pycache__/
+*.pyc
+.vscode/launch.json
+.vscode/tasks.json
+state/
+logs/
+backtest_out/
+.claude/settings.json

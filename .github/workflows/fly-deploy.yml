@@ -1,0 +1,27 @@
+name: Deploy to Fly.io
+
+# Auto-deploy on every push to main (e.g. when a PR is merged). Deploys ship
+# code only — the live config.yaml lives on the state_data volume and persists
+# across deploys (see fly.toml). Requires a FLY_API_TOKEN repo secret:
+#   fly tokens create deploy -x 999999h -a signalautomation
+# then add the output as a GitHub Actions secret named FLY_API_TOKEN.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    concurrency: deploy-group   # never run two deploys at once
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned to a full commit SHA (= setup-flyctl v1.6) rather than a moving
+      # @master branch: this job holds FLY_API_TOKEN, so a compromised upstream
+      # action must not be able to silently run new code here. Bump deliberately.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

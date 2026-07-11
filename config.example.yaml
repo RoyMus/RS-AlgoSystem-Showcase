@@ -1,0 +1,151 @@
+# ============================================================
+# AutomateCryptoSignals — CONFIG TEMPLATE
+# ============================================================
+# This is the committed TEMPLATE. The real config is NOT in git: it lives on the
+# fly.io persistent volume at /app/state/config.yaml (pointed to by CONFIG_PATH)
+# and is edited on the running instance over fly's authenticated SSH (fly ssh console
+# / sftp), then `fly apps restart` to apply. On first boot, if the volume has no
+# config yet, this template is copied there to seed it — then you edit it to your
+# real strategy.
+#
+# Secrets (API keys, tokens) are NEVER stored here — only ${VAR} placeholders,
+# resolved from fly secrets / .env at load time.
+# ============================================================
+
+# ----------------------------------------------------------
+# Signal sources and their weights (0.0–1.0).
+# ----------------------------------------------------------
+signals:
+  system_1:
+    weight: 1.0
+  # system_2:
+  #   weight: 0.5
+
+# ----------------------------------------------------------
+# Exchanges. Set enabled: false to skip one without removing it.
+# Each client's api_key/api_secret are ${VAR} placeholders (fly secrets).
+# ----------------------------------------------------------
+exchanges:
+  bybit:
+    enabled: false
+    testnet: false
+    clients:
+      - label: bybit_main
+        api_key: ${BYBIT_1_API_KEY}
+        api_secret: ${BYBIT_1_API_SECRET}
+        dry_run: true
+      # Paper "prop-firm" account on Bybit Demo Trading (api-demo.bybit.com).
+      # demo: true routes to the Demo Trading host (NOT testnet) — it supports
+      # futures, unlike testnet where derivatives are KYC-blocked. Use Demo
+      # Trading API keys created from bybit.com → Demo Trading.
+      # - label: bybit_demo
+      #   api_key: ${BYBIT_TEST_API_KEY}
+      #   api_secret: ${BYBIT_TEST_API_SECRET}
+      #   demo: true            # connect to Bybit Demo Trading
+      #   dry_run: false        # place real (paper) orders
+      #   market_type: futures  # linear USDT perpetuals
+      #   leverage: 1           # 1x = replicate spot exposure
+      #   margin_mode: isolated
+
+  binance:
+    enabled: false
+    testnet: false
+    clients:
+      - label: binance_main
+        api_key: ${BINANCE_1_API_KEY}
+        api_secret: ${BINANCE_1_API_SECRET}
+        dry_run: true
+
+  kraken:
+    enabled: true
+    testnet: false
+    quote_currency: USD
+    clients:
+      - label: kraken_main
+        api_key: ${KRAKEN_MAIN_API_KEY}
+        api_secret: ${KRAKEN_MAIN_API_SECRET}
+        dry_run: true          # ← start in dry_run; flip to false when ready to trade live
+        use_earn: false        # ← requires the "Earn" permission on the Kraken API key
+
+# ----------------------------------------------------------
+# Execution settings
+# ----------------------------------------------------------
+execution:
+  aggregation_window_ms: 30000
+  min_allocation: 0.001
+  min_trade_value: 5.0
+  order_delay_ms: 1000
+  portfolio_exposure: 1.0
+
+# ----------------------------------------------------------
+# Server settings
+# ----------------------------------------------------------
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+  # Token for webhook signals AND the legacy admin-guarded endpoints
+  # (/signal/run, /state, /test/*, /report/now, /config/*).
+  webhook_token: ${WEBHOOK_TOKEN}
+
+  # There is NO config API/dashboard. In prod the real config lives on the fly
+  # volume at /app/state/config.yaml and is edited over fly's authenticated SSH:
+  #   fly ssh console -a signalautomation -C "vi /app/state/config.yaml"
+  #   fly apps restart signalautomation   # restart to apply
+
+# ----------------------------------------------------------
+# Notifications (Telegram) — reports + instant error/tamper alerts.
+# ----------------------------------------------------------
+notifications:
+  telegram:
+    enabled: true
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}
+  throttle_seconds: 300
+
+# ----------------------------------------------------------
+# Reporting & equity tracking
+# ----------------------------------------------------------
+reporting:
+  equity_sample_interval_minutes: 60
+  weekly_report_day: "mon"
+  weekly_report_at_utc: "08:00"
+  # Accounts (exchange-client labels) to include in the weekly report, each shown as
+  # its own section. Omit or leave empty to include every account.
+  report_accounts:
+
+# ----------------------------------------------------------
+# Position profit monitor + interactive Telegram rebalancing
+# ----------------------------------------------------------
+# When enabled (and Telegram is configured) the bot tracks each position's unrealized
+# P&L against a cost-basis ledger and messages you when one is up past the threshold,
+# offering to rebalance. You reply in the chat:
+#   rebalance SOL   → trim SOL back to its strategy target weight (proceeds → cash)
+#   rebalance       → re-apply current strategy targets to the whole portfolio
+#   yes / cancel    → confirm or abort the planned trade
+#   status          → show positions & unrealized P&L
+# The inbound command listener runs whenever Telegram is enabled; this block only
+# controls the proactive profit alerts.
+position_monitor:
+  enabled: true
+  profit_threshold_pct: 25.0      # alert when a position is up at least this much
+  check_interval_minutes: 60      # how often to evaluate positions
+  alert_throttle_hours: 24        # don't re-alert the same asset more often than this
+
+# ----------------------------------------------------------
+# Built-in signal generator (RS Algo) — see config comments in the real config.
+# ----------------------------------------------------------
+signal_generator:
+  enabled: true
+  run_at_utc: "00:10"
+  run_on_start: false
+  timeout_seconds: 300
+  systems:
+    # One static RS system over a fixed basket. Any key here overrides the
+    # matching default in src/signals/engine.py CONFIG for this system.
+    - system: system_1
+      assets: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "SUIUSDT", "XRPUSDT", "BNBUSDT"]
+      # Gold trend filter source (fetched via yfinance). GLD (spot-gold ETF) is a
+      # clean spot-gold proxy; omit/set None to use PAXG's own 24/7 close, or
+      # "GC=F" for COMEX gold futures.
+      gold_filter_sym: GLD

@@ -1,0 +1,15 @@
+fastapi[standard]>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+ccxt>=4.3.0
+pyyaml>=6.0.1
+python-dotenv>=1.0.1
+
+# Signal generator (src/signals/engine.py)
+numpy>=1.26.0
+pandas>=2.2.0
+requests>=2.31.0
+yfinance>=0.2.40
+
+# Optional — only needed when vault.enabled: true in config.yaml
+# oci>=2.125.0

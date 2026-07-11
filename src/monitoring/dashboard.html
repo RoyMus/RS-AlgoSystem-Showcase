@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Portfolio — AutomateCryptoSignals</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    /* Stop the page from ever being wider than the device. Without this, the wide ASE
+       table forces the layout viewport past the screen width and mobile browsers respond
+       by zooming the whole page out (the "desktop view, must pinch to read" symptom). */
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body {
+      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0e1117; color: #e6edf3; padding: 24px;
+    }
+    /* Grid/flex items default to min-width:auto, which refuses to shrink below their
+       content. That lets the wide tables push the column wider than the screen. Forcing
+       min-width:0 lets the .tscroll containers keep their overflow to themselves. */
+    .grid > * { min-width: 0; }
+    h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+    .sub { color: #8b949e; font-size: 13px; margin-bottom: 24px; }
+    .grid { display: grid; gap: 16px; max-width: 920px; margin: 0 auto; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
+    .card .label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .card .value { font-size: 24px; font-weight: 600; margin-top: 6px; }
+    .pos { font-variant-numeric: tabular-nums; }
+    .pos table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .pos th, .pos td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #21262d; }
+    .pos th { color: #8b949e; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+    .pos td.num, .pos th.num { text-align: right; }
+    .pos .bar { height: 6px; background: #1f6feb; border-radius: 3px; }
+    .pos .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
+    .legend .lg { display: inline-flex; align-items: center; gap: 6px; color: #8b949e; font-size: 12px; }
+    .legend .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .up { color: #3fb950; } .down { color: #f85149; }
+    .wrap { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
+    footer { color: #6e7681; font-size: 12px; text-align: center; margin-top: 24px; }
+    .err { color: #f85149; font-size: 13px; }
+    .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .topbar-left { display: flex; flex-direction: column; gap: 8px; }
+    .topbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .logout button { background: transparent; color: #8b949e; border: 1px solid #30363d; border-radius: 6px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .logout button:hover { color: #e6edf3; border-color: #8b949e; }
+    #account-select { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px;
+      padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; outline: none; }
+    #account-select:hover { border-color: #8b949e; }
+    #export-link { color: #8b949e; border: 1px solid #30363d; border-radius: 6px;
+      padding: 6px 12px; font-size: 13px; text-decoration: none; font-family: inherit; white-space: nowrap; }
+    #export-link:hover { color: #e6edf3; border-color: #8b949e; }
+    /* Horizontal-scroll container for wide tables on mobile. On desktop the tables are
+       narrow enough that no scrollbar appears; on phones the user swipes to see all columns. */
+    .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Chart wrapper: extracted from inline style so the media query can reduce height on phones. */
+    .chartbox { position: relative; height: 280px; }
+
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      h1 { font-size: 20px; }
+      .sub { margin-bottom: 0; }
+      .grid { gap: 12px; }
+      /* Header: title (with controls beneath it) grows to fill, log-out stays top-right. */
+      .topbar { gap: 12px; }
+      .topbar-left { flex: 1 1 auto; }
+      /* Account picker + export stretch full width so they're easy to tap. */
+      .topbar-controls { width: 100%; }
+      #account-select { flex: 1 1 auto; min-height: 40px; }
+      #export-link { min-height: 40px; display: inline-flex; align-items: center; }
+      /* 2-up stat cards instead of 4-in-a-row */
+      .cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .card { padding: 12px; }
+      .card .label { font-size: 11px; }
+      .card .value { font-size: 20px; }
+      .wrap { padding: 12px; }
+      .pos th, .pos td { padding: 6px 8px; font-size: 13px; }
+      /* Wide tables (positions, ASE) scroll horizontally inside .tscroll; hint it. */
+      .tscroll { margin: 0 -2px; padding-bottom: 2px; }
+      .tscroll table { font-size: 13px; }
+      /* Shorter chart on phones */
+      .chartbox { height: 220px; }
+      /* Make the Preview button easy to tap on narrow screens */
+      .ase-btn-col { align-items: stretch; width: 100%; }
+      #ase-preview-btn { width: 100%; min-height: 40px; font-size: 14px; }
+    }
+
+    /* Very narrow phones: drop stat cards to a single column so values aren't cramped. */
+    @media (max-width: 380px) {
+      .cards { grid-template-columns: 1fr; }
+      .card .value { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div>
+          <h1>Portfolio</h1>
+          <div class="sub" id="updated">Loading…</div>
+        </div>
+        <div class="topbar-controls">
+          <select id="account-select"><option value="__combined__">All accounts (combined)</option></select>
+          <a id="export-link" href="/public/accounts/export?account=__combined__" download>Export CSV</a>
+        </div>
+      </div>
+      <form method="POST" action="/logout" class="logout"><button type="submit">Log out</button></form>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="label">Equity</div><div class="value" id="equity">—</div></div>
+      <div class="card"><div class="label">Max Drawdown</div><div class="value" id="maxdd">—</div></div>
+      <div class="card"><div class="label">7-day P&amp;L</div><div class="value" id="pnl7">—</div></div>
+      <div class="card"><div class="label">Since inception</div><div class="value" id="pnlAll">—</div></div>
+      <div class="card"><div class="label">Sharpe</div><div class="value" id="sharpe">—</div></div>
+      <div class="card"><div class="label">Current signal</div><div class="value" id="signal-val" style="font-size:16px;">—</div></div>
+    </div>
+
+    <div class="wrap">
+      <!-- Fixed-height wrapper bounds the canvas so Chart.js
+           (responsive + maintainAspectRatio:false) can't grow it on each refresh.
+           Height is controlled by .chartbox (280px desktop, 220px on phones via media query). -->
+      <div class="chartbox">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+        <div style="font-size:15px;font-weight:600;">Strategy Equity
+          <span style="color:#8b949e;font-weight:400;font-size:12px;">(base_eq · simulated)</span>
+        </div>
+        <div id="strat-sub" style="color:#8b949e;font-size:12px;">—</div>
+      </div>
+      <div class="chartbox">
+        <canvas id="chart2"></canvas>
+      </div>
+      <div id="legend2" class="legend"></div>
+    </div>
+
+    <div class="wrap pos">
+      <div class="tscroll">
+        <table style="min-width:340px;">
+          <thead><tr><th>Asset</th><th class="num">Value</th><th class="num">Alloc</th><th></th></tr></thead>
+          <tbody id="positions"><tr><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- #accounts-section removed from the refresh loop; the dropdown now covers per-account views. -->
+    <div id="accounts-section" style="display:none;"><div id="accounts"></div></div>
+
+    <footer>Read-only · auto-refreshes every 60s · P&amp;L is raw equity change (deposits not adjusted)</footer>
+  </div>
+
+  <script>
+    let chart;
+    let chart2;
+
+    // The account the user has selected in the dropdown; persisted across 60s refreshes.
+    let _selectedAccount = "__combined__";
+    // Last loaded accounts payload — used when the dropdown changes without a full reload.
+    let _accountsData = null;
+    // Last loaded positions payload.
+    let _posData = null;
+    // Last strategy-curve points — used to build the strategy legend.
+    let _stratPoints = [];
+
+    // Per-asset colours for the basket.
+    const ASSET_COLORS = {
+      BTC:"#d37100", ETH:"#00ffff", SOL:"#6502f9", BNB:"#a68500", PAXG:"#ffff00",
+      XRP:"#00ffd0", DOGE:"#9dff00", HYPE:"#9000ff", ZEC:"#dbbe2f", ADA:"#00d2ff",
+      LINK:"#006aff", XMR:"#ff6200", TON:"#0088cc", LTC:"#a3a3a3", AVAX:"#af0000",
+      SUI:"#ff5252", HBAR:"#ff78c8", TAO:"#00ff26",
+      CASH:"#c9d1d9", USD:"#c9d1d9", USDT:"#c9d1d9", USDC:"#c9d1d9", Earn:"#3fb950",
+    };
+    function assetColor(base) {
+      if (!base) return "#1f6feb";
+      if (ASSET_COLORS[base]) return ASSET_COLORS[base];
+      let h = 0; for (const ch of base) h = (h * 31 + ch.charCodeAt(0)) >>> 0;  // stable fallback
+      return `hsl(${h % 360}, 70%, 60%)`;
+    }
+    const fmt = (n, q) => (n == null ? "—" : n.toLocaleString(undefined, {maximumFractionDigits: 2}) + (q ? " " + q : ""));
+    const signed = (n) => (n >= 0 ? "+" : "") + n.toLocaleString(undefined, {maximumFractionDigits: 2});
+    const pct = (f) => (f >= 0 ? "+" : "") + (f * 100).toFixed(2) + "%";
+
+    // pnlFrom: expects points as [{t, v}]. Returns {abs, pct} or null.
+    function pnlFrom(points, days) {
+      if (!points.length) return null;
+      const end = points[points.length - 1].v;
+      const cutoff = Date.now() - days * 86400000;
+      let start = points[0].v;
+      for (const p of points) { if (new Date(p.t).getTime() <= cutoff) start = p.v; else break; }
+      // Guard: if baseline is implausibly small relative to current equity (e.g. earn was
+      // disabled when history started), the percentage would be absurd — suppress it.
+      if (start < 1 || start < end * 0.01) return { abs: end - start, pct: null };
+      return { abs: end - start, pct: start > 0 ? (end - start) / start : 0 };
+    }
+
+    // Annualised Sharpe ratio (risk-free = 0) from an equity series [{t, v}].
+    // Uses per-sample simple returns, annualised by the average sampling interval, so it
+    // works whether equity is sampled hourly or daily. Returns null until there's enough
+    // data (≥3 points / ≥2 returns with non-zero volatility) to be meaningful.
+    function sharpe(points) {
+      if (!points || points.length < 3) return null;
+      const rets = [];
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1].v, cur = points[i].v;
+        if (prev > 0) rets.push(cur / prev - 1);
+      }
+      if (rets.length < 2) return null;
+      const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+      const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length - 1);
+      const sd = Math.sqrt(variance);
+      if (!(sd > 0)) return null;
+      const t0 = new Date(points[0].t).getTime();
+      const tN = new Date(points[points.length - 1].t).getTime();
+      const avgDtSec = (tN - t0) / 1000 / (points.length - 1);
+      if (!(avgDtSec > 0)) return null;
+      const periodsPerYear = (365.25 * 24 * 3600) / avgDtSec;
+      return (mean / sd) * Math.sqrt(periodsPerYear);
+    }
+
+    function setSharpe(points) {
+      const el = document.getElementById("sharpe");
+      if (!el) return;
+      const s = sharpe(points);
+      if (s == null) { el.textContent = "—"; el.className = "value"; return; }
+      el.textContent = s.toFixed(2);
+      el.className = "value " + (s >= 0 ? "up" : "down");
+    }
+
+    function setPnl(elId, p, q) {
+      const el = document.getElementById(elId);
+      if (!p) { el.textContent = "—"; return; }
+      el.textContent = signed(p.abs) + " " + q;
+      el.className = "value " + (p.abs >= 0 ? "up" : "down");
+      if (p.pct != null) {
+        el.title = pct(p.pct);
+        el.insertAdjacentHTML("beforeend", ` <span style="font-size:14px">(${pct(p.pct)})</span>`);
+      }
+    }
+
+    // Fetch a data feed; if the session has expired the server replies 401 → bounce to login.
+    async function getJSON(url) {
+      const r = await fetch(url);
+      if (r.status === 401) { location.href = "/login"; throw new Error("session expired"); }
+      return r.json();
+    }
+
+    // Account equity curve — a plain line of the account's value over time. No
+    // asset colouring here: this is just "money over time". (The Strategy Equity
+    // chart below keeps the Pine-style per-asset colouring, where it's meaningful.)
+    function drawChart(points, q) {
+      const labels = points.map(p => new Date(p.t).toLocaleDateString(undefined, {month: "short", day: "numeric"}));
+      const data = points.map(p => p.v);
+      const ctx = document.getElementById("chart");
+      if (chart) {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+        return;
+      }
+      chart = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets: [{
+          label: "Equity (" + q + ")", data,
+          borderColor: "#1f6feb",
+          backgroundColor: "rgba(31,111,235,.10)", fill: true, tension: .25,
+          pointRadius: 0, borderWidth: 2,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: "#21262d" }, ticks: { color: "#8b949e", maxTicksLimit: 8 } },
+            y: { grid: { color: "#21262d" }, ticks: { color: "#8b949e" } },
+          },
+        },
+      });
+    }
+
+    // Strategy ("base_eq") equity — simulated curve, coloured by held asset (rotations),
+    // normalised to 1.0 at its anchor ("today" when first enabled). Mirrors the .pine plot.
+    function drawStrategyChart(points) {
+      _stratPoints = points;
+      const labels = points.map(p => new Date(p.t).toLocaleDateString(undefined, {month: "short", day: "numeric"}));
+      const data = points.map(p => p.v);
+      const colors = points.map(p => assetColor(p.a));
+      const ctx = document.getElementById("chart2");
+      const segColor = (c) => (chart2 && chart2._colors ? chart2._colors[c.p1DataIndex] : colors[c.p1DataIndex]) || "#1f6feb";
+      if (chart2) {
+        chart2.data.labels = labels;
+        chart2.data.datasets[0].data = data;
+        chart2._colors = colors;
+        chart2.data.datasets[0].pointBackgroundColor = colors;
+        chart2.update();
+        return;
+      }
+      chart2 = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets: [{
+          label: "Equity (×)", data,
+          borderColor: "#1f6feb",
+          segment: { borderColor: segColor },
+          pointBackgroundColor: colors,
+          backgroundColor: "rgba(31,111,235,.10)", fill: true, tension: .25,
+          pointRadius: 0, borderWidth: 2,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: (c) => c.parsed.y.toFixed(4) + "×",
+              afterLabel: (c) => "Held: " + (points[c.dataIndex]?.a || "—"),
+            } },
+          },
+          scales: {
+            x: { grid: { color: "#21262d" }, ticks: { color: "#8b949e", maxTicksLimit: 8 } },
+            y: { grid: { color: "#21262d" }, ticks: { color: "#8b949e", callback: (v) => Number(v).toFixed(2) + "×" } },
+          },
+        },
+      });
+      chart2._colors = colors;
+    }
+
+    // Legend: distinct assets the curve has held, each in its colour.
+    function drawLegend(points, elId = "legend") {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const seen = [];
+      for (const p of points) { if (p.a && !seen.includes(p.a)) seen.push(p.a); }
+      el.innerHTML = seen.map(a =>
+        `<span class="lg"><span class="dot" style="background:${assetColor(a)}"></span>${a}</span>`
+      ).join("");
+    }
+
+    // Strategy-equity legend (#legend2): the distinct assets the simulated curve
+    // has held over the window.
+    function drawStrategyLegend() {
+      drawLegend(_stratPoints, "legend2");
+    }
+
+    // drawPositions: renders into #positions from a positions-like object.
+    // `overridePositions` — if provided, use these rows instead of pos.positions.
+    function drawPositions(pos, q, overridePositions) {
+      const srcRows = overridePositions !== undefined ? overridePositions : (pos.positions || []);
+      const rows = srcRows.filter(p => (p.value || 0) >= 0.01);
+      const body = document.getElementById("positions");
+      const totalVal = pos.total_value;
+      if ((pos.quote_free || 0) >= 0.01) rows.push({ base: "Cash", value: pos.quote_free, pct: totalVal ? pos.quote_free / totalVal : 0 });
+      if ((pos.earn_value || 0) >= 0.01) rows.push({ base: "Earn", value: pos.earn_value, pct: totalVal ? pos.earn_value / totalVal : 0 });
+      if (!rows.length) { body.innerHTML = '<tr><td colspan="4">No positions</td></tr>'; return; }
+      body.innerHTML = rows.map(p => `
+        <tr>
+          <td><span class="swatch" style="background:${assetColor(p.base)}"></span>${p.base}</td>
+          <td class="num">${fmt(p.value, q)}</td>
+          <td class="num">${((p.pct || 0) * 100).toFixed(1)}%</td>
+          <td style="width:30%"><div class="bar" style="width:${Math.max(2, (p.pct || 0) * 100).toFixed(1)}%;background:${assetColor(p.base)}"></div></td>
+        </tr>`).join("");
+    }
+
+    // -----------------------------------------------------------------------
+    // Account dropdown + headline logic
+    // -----------------------------------------------------------------------
+
+    // Rebuild the <select> from fresh accounts data. Preserve the selection.
+    function rebuildDropdown(accts) {
+      const sel = document.getElementById("account-select");
+      const prev = _selectedAccount;
+      sel.innerHTML = '<option value="__combined__">All accounts (combined)</option>';
+      for (const a of accts) {
+        const expLabel = (a.exposure != null && a.exposure !== 1.0)
+          ? ` · ${(a.exposure * 100).toFixed(0)}%` : "";
+        const opt = document.createElement("option");
+        opt.value = a.name;
+        opt.textContent = a.name + expLabel;
+        sel.appendChild(opt);
+      }
+      // Restore previous selection if it still exists, else fall back to combined.
+      const exists = [...sel.options].some(o => o.value === prev);
+      sel.value = exists ? prev : "__combined__";
+      _selectedAccount = sel.value;
+      updateExportLink();
+    }
+
+    function updateExportLink() {
+      const link = document.getElementById("export-link");
+      if (link) link.href = "/public/accounts/export?account=" + encodeURIComponent(_selectedAccount);
+    }
+
+    // Build a combined curve by summing per-account values at aligned timestamps.
+    // All accounts are sampled together so we align by ts string.
+    function buildCombinedPoints(accts) {
+      // Sum per-account values at each ts. Colour the combined point by the asset of
+      // the largest-value account at that ts (≈ the portfolio's dominant holding),
+      // so the combined legend reflects what actually dominates the book.
+      const map = new Map();
+      for (const a of accts) {
+        for (const p of (a.points || [])) {
+          const ts = p.ts;
+          const v = p.value || 0;
+          const e = map.get(ts);
+          if (e) {
+            e.v += v;
+            if (v > e._maxv) { e._maxv = v; e.a = p.asset || "CASH"; }
+          } else {
+            map.set(ts, { t: ts, v, a: p.asset || "CASH", _maxv: v });
+          }
+        }
+      }
+      // Sort by ts string (ISO 8601 sorts lexicographically).
+      return [...map.values()].sort((x, y) => (x.t < y.t ? -1 : x.t > y.t ? 1 : 0));
+    }
+
+    // Combined P&L: sum each account's own since-start delta (avoids treating a
+    // newly-funded account as profit on the combined curve).
+    function combinedPnlFrom(accts, days) {
+      let totalAbs = 0;
+      let totalStart = 0;
+      let anyData = false;
+      for (const a of accts) {
+        const pts = (a.points || []).map(p => ({ t: p.ts, v: p.value || 0 }));
+        const p = pnlFrom(pts, days);
+        if (!p) continue;
+        anyData = true;
+        totalAbs += p.abs;
+        // Start value = first point's value (or derived from abs + end).
+        const endV = pts.length ? pts[pts.length - 1].v : 0;
+        const startV = endV - p.abs;
+        if (startV > 1) totalStart += startV;
+      }
+      if (!anyData) return null;
+      return {
+        abs: totalAbs,
+        pct: totalStart > 0 ? totalAbs / totalStart : null,
+      };
+    }
+
+    // Render the headline cards + main chart for the currently selected account.
+    function applyAccountView(accts, pos, q) {
+      if (_selectedAccount === "__combined__") {
+        // Equity = sum of all accounts' current values.
+        const totalCurrent = accts.reduce((s, a) => s + (a.current || 0), 0);
+        document.getElementById("equity").textContent = fmt(totalCurrent || null, q);
+
+        // Combined curve.
+        const combinedPts = buildCombinedPoints(accts);
+
+        // Max DD from combined curve.
+        let peak = 0, maxDD = 0;
+        for (const p of combinedPts) {
+          peak = Math.max(peak, p.v);
+          if (peak > 0) maxDD = Math.max(maxDD, (peak - p.v) / peak);
+        }
+        const maxddEl = document.getElementById("maxdd");
+        maxddEl.textContent = combinedPts.length ? "-" + (maxDD * 100).toFixed(1) + "%" : "—";
+        maxddEl.className = "value down";
+
+        // Combined P&L via sum-of-deltas method.
+        const p7 = combinedPnlFrom(accts, 7);
+        const pAll = combinedPnlFrom(accts, 36500);
+        setPnl("pnl7", p7, q);
+        setPnl("pnlAll", pAll, q);
+        setSharpe(combinedPts);
+
+        drawChart(combinedPts, q);
+        // Positions: use the aggregate /public/positions data already loaded.
+        drawPositions(pos, q);
+      } else {
+        const a = accts.find(x => x.name === _selectedAccount);
+        if (!a) { _selectedAccount = "__combined__"; applyAccountView(accts, pos, q); return; }
+        const pts = (a.points || []).map(p => ({ t: p.ts, v: p.value || 0, a: p.asset || "CASH" }));
+
+        document.getElementById("equity").textContent = fmt(a.current, q);
+
+        const maxddEl = document.getElementById("maxdd");
+        maxddEl.textContent = "-" + ((a.max_dd || 0) * 100).toFixed(1) + "%";
+        maxddEl.className = "value down";
+
+        setPnl("pnl7", pnlFrom(pts, 7), q);
+        setPnl("pnlAll", pnlFrom(pts, 36500), q);
+        setSharpe(pts);
+
+        drawChart(pts, q);
+
+        // Per-account positions + cash/earn rows.
+        const accPos = {
+          positions: a.positions || [],
+          quote_free: a.quote_free || 0,
+          earn_value: a.earn_value || 0,
+          total_value: a.current,
+        };
+        drawPositions(accPos, q);
+      }
+    }
+
+    async function loadStrategy() {
+      const se = await getJSON("public/strategy-equity");
+      let points = (se.points || []).map(p => ({ t: p.ts, v: p.equity, a: p.asset }));
+      const sub = document.getElementById("strat-sub");
+
+      // Never show an empty chart: with no data (generator hasn't produced a curve yet),
+      // draw a flat 1.0× cash line so the panel reads "flat, in cash" rather than blank.
+      // With a single point, extend it to "today" so there's a visible horizontal line.
+      if (!points.length) {
+        const today = new Date();
+        const start = se.anchor ? new Date(se.anchor + "T00:00:00Z") : new Date(today.getTime() - 30 * 86400000);
+        points = [
+          { t: start.toISOString(), v: 1, a: "CASH" },
+          { t: today.toISOString(), v: 1, a: "CASH" },
+        ];
+        if (sub) sub.textContent = "since " + (se.anchor || start.toISOString().slice(0, 10)) + " · 1.00× · currently in cash";
+        drawStrategyChart(points);
+        drawStrategyLegend();
+        return;
+      }
+      if (points.length === 1) {
+        points = [points[0], { ...points[0], t: new Date().toISOString() }];
+      }
+
+      // Cash check: is the last point (or all points) CASH?
+      const lastAsset = points[points.length - 1].a;
+      const allCash = points.every(p => p.a === "CASH");
+      if (sub) {
+        const cur = se.current != null ? se.current.toFixed(2) + "×" : "—";
+        const dd = se.max_dd != null ? " · max DD -" + (se.max_dd * 100).toFixed(1) + "%" : "";
+        const cashNote = (lastAsset === "CASH" || allCash) ? " · currently in cash" : "";
+        sub.textContent = "since " + (se.anchor || "—") + " · " + cur + dd + cashNote;
+      }
+      drawStrategyChart(points);
+      drawStrategyLegend();
+    }
+
+    async function loadSignal() {
+      try {
+        const sig = await getJSON("public/signal");
+        const el = document.getElementById("signal-val");
+        if (!el) return;
+        if (sig.cash || !sig.targets || !sig.targets.length) {
+          el.textContent = "CASH";
+          el.style.color = ASSET_COLORS["CASH"] || "#c9d1d9";
+          return;
+        }
+        // Format: "BTC 60% · ETH 40%"
+        const parts = sig.targets.map(t =>
+          `<span style="color:${assetColor(t.base)}">${t.base}</span> ${(t.frac * 100).toFixed(0)}%`
+        );
+        el.innerHTML = parts.join(' <span style="color:#8b949e">·</span> ');
+        el.style.color = "";
+      } catch (_) {
+        // Non-fatal: just leave the previous value.
+      }
+    }
+
+    async function load() {
+      try {
+        const [acctData, pos] = await Promise.all([
+          getJSON("public/accounts"),
+          getJSON("public/positions"),
+        ]);
+        _accountsData = acctData;
+        _posData = pos;
+        const accts = acctData.accounts || [];
+        const q = acctData.quote || pos.quote || "";
+
+        // Rebuild dropdown, preserving user selection.
+        rebuildDropdown(accts);
+
+        // Render headline + chart for the selected view.
+        applyAccountView(accts, pos, q);
+
+        document.getElementById("updated").textContent =
+          pos.timestamp ? "Updated " + new Date(pos.timestamp).toLocaleString() : "No data yet";
+
+        try { await loadStrategy(); } catch (_) {}
+        try { await loadSignal(); } catch (_) {}
+      } catch (e) {
+        document.getElementById("updated").innerHTML = '<span class="err">Failed to load data: ' + e + '</span>';
+      }
+    }
+
+    // Wire up the dropdown: re-apply the account view immediately on change.
+    document.getElementById("account-select").addEventListener("change", function() {
+      _selectedAccount = this.value;
+      updateExportLink();
+      if (_accountsData && _posData) {
+        const accts = _accountsData.accounts || [];
+        const q = _accountsData.quote || _posData.quote || "";
+        applyAccountView(accts, _posData, q);
+      }
+    });
+
+    load();
+    setInterval(load, 60000);
+  </script>
+</body>
+</html>
