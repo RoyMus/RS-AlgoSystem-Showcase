@@ -25,7 +25,12 @@ webhook, so the endpoint that moves money is never exposed to the internet.
 
 ### The strategy
 
-Over a fixed basket, each bar the engine (`src/signals/engine.py`):
+The default basket is **BTC, ETH, SOL, SUI, XRP, BNB** (USDT pairs), with **PAXG**
+as the gold hedge held in bear markets. BTC is the benchmark (for the alpha and
+trend filters) and **GLD** (spot-gold ETF) supplies the gold trend. The basket and
+gold-filter symbol are set per system in `config.yaml` (see `config.example.yaml`).
+
+Over this fixed basket, each bar the engine (`src/signals/engine.py`):
 
 1. Computes an **RSI signal** for every price and every pairwise price ratio —
    RSI(14) on a 7-day EMA, scored `+1` above 50 and `-1` below.
