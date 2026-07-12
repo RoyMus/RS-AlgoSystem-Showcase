@@ -36,6 +36,24 @@ Over a fixed basket, each bar the engine (`src/signals/engine.py`):
 4. Applies a **bear-market filter**: when BTC's own trend is negative, it rotates
    to gold (PAXG) if the spot-gold trend (GLD proxy) is positive, else to cash.
 
+### Backtest
+
+`python -m src.signals.backtest` replays the exact same signal pipeline through a
+daily equity walk-forward. Over **2023-01-01 → 2026-07-11** on the default
+6-asset basket:
+
+| Metric                | RS strategy | HODL BTC |
+|-----------------------|------------:|---------:|
+| Total return          |   +3466%    |   +285%  |
+| CAGR                  |   +175.6%   |     —    |
+| Sharpe (rf=0, √365)   |     2.01    |     —    |
+| Max drawdown          |     43.0%   |    53.0% |
+| Annualised volatility |     58.7%   |     —    |
+
+> Reproduce with `python -m src.signals.backtest` (writes `backtest_out/`). These
+> are gross figures on daily closes — no trading fees, slippage, or funding are
+> modelled, so treat them as a strategy-logic demo, not a live-performance claim.
+
 ## Setup
 
 ```bash
