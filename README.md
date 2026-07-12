@@ -1,4 +1,4 @@
-# AutomateCryptoSignals
+# Rs Algo System Showcase
 
 A self-contained crypto trading system: it generates a **relative-strength (RS)
 rotation** signal in-process on a daily schedule and executes the resulting
