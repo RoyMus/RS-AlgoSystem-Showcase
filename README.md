@@ -41,6 +41,8 @@ Over a fixed basket, each bar the engine (`src/signals/engine.py`):
 daily equity walk-forward. Over **2023-01-01 → 2026-07-11** on the default
 6-asset basket:
 
+![Backtest equity vs HODL BTC](docs/equity.png)
+
 | Metric                | RS strategy | HODL BTC |
 |-----------------------|------------:|---------:|
 | Total return          |   +3466%    |   +285%  |
