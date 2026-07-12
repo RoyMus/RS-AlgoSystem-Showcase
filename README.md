@@ -7,8 +7,7 @@ read-only web dashboard shows the live equity curve and current positions.
 
 > This is a simplified showcase edition. The strategy uses a plain RSI-based
 > relative-strength rule over a fixed basket, with a spot-gold trend filter for
-> bear markets. (No dynamic asset-selection engine and no volatility-parity
-> position sizing.)
+> bear markets.
 
 ## How it works
 
