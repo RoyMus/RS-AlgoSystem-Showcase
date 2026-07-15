@@ -35,7 +35,7 @@ Over this fixed basket, each bar the engine (`src/signals/engine.py`):
 1. Computes an **RSI signal** for every price and every pairwise price ratio —
    RSI(14) on a 7-day EMA, scored `+1` above 50 and `-1` below.
 2. Ranks assets by their pairwise RS score, disqualifying any with a negative
-   own-trend, no rolling alpha vs BTC, or below-median alpha.
+   own-trend.
 3. Picks the top asset (and a co-leader on ties) at a fixed weight.
 4. Applies a **bear-market filter**: when BTC's own trend is negative, it rotates
    to gold (PAXG) if the spot-gold trend (GLD proxy) is positive, else to cash.
